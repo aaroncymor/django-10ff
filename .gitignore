@@ -1,0 +1,14 @@
+# Django and HTMX project
+*.sqlite3
+*.log
+local_settings.py
+db.sqlite3
+staticfiles/
+media/
+__pycache__/
+
+# HTMX
+.htmx/
+
+venv
+.prompt/

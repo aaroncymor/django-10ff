@@ -1,0 +1,17 @@
+<div id="word-display">
+    <span class="current-word">{{ words.0 }}</span>
+    <span class="word-queue">{{ words|slice:"1:" |join:" " }}</span>
+</div>
+<input type="text" 
+       id="input-field" 
+       autocomplete="off" 
+       autocorrect="off" 
+       autocapitalize="off" 
+       spellcheck="false">
+<input type="hidden" 
+       id="game-state" 
+       name="current_index" 
+       value="0">
+<input type="hidden" 
+       name="words" 
+       value="{{ words|join:',' }}">

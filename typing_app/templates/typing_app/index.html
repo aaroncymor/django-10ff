@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Typing Test</title>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        #word-display {
+            font-size: 24px;
+            margin: 20px 0;
+            min-height: 50px;
+            line-height: 1.5;
+        }
+        #input-field {
+            font-size: 20px;
+            padding: 10px;
+            width: 100%;
+            margin-bottom: 20px;
+            border: 2px solid #ccc;
+            border-radius: 4px;
+        }
+        .current-word {
+            color: #333;
+            font-weight: bold;
+        }
+        .word-queue {
+            color: #666;
+            margin-left: 10px;
+        }
+        .correct {
+            border-color: #28a745 !important;
+        }
+        .incorrect {
+            border-color: #dc3545 !important;
+        }
+        #timer {
+            font-size: 20px;
+            margin-bottom: 20px;
+            font-weight: bold;
+        }
+        #results {
+            margin-top: 20px;
+            padding: 20px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+            display: none;
+        }
+        .try-again-btn {
+            display: inline-block;
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-top: 10px;
+        }
+        .try-again-btn:hover {
+            background-color: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <h1>Typing Test</h1>
+    {% csrf_token %}
+    <div id="timer">Time: 60s</div>
+    <div id="game-container">
+        <div id="word-display">
+            <span class="current-word">{{ words.0 }}</span>
+            <span class="word-queue">{{ words|slice:"1:" |join:" " }}</span>
+        </div>
+        <input type="text" 
+               id="input-field" 
+               autocomplete="off" 
+               autocorrect="off" 
+               autocapitalize="off" 
+               spellcheck="false">
+        <input type="hidden" 
+               id="game-state" 
+               name="current_index" 
+               value="0">
+        <input type="hidden" 
+               name="words" 
+               value="{{ words|join:',' }}">
+    </div>
+    <div id="results"></div>
+
+    <script>
+        let startTime = null;
+        let timerInterval = null;
+        let correctWords = 0;
+        const inputField = document.getElementById('input-field');
+        const timerElement = document.getElementById('timer');
+        const wordDisplay = document.getElementById('word-display');
+        const gameState = document.getElementById('game-state');
+        const words = document.querySelector('[name="words"]').value.split(',');
+
+        function startTimer() {
+            let timeLeft = 60;
+            startTime = Date.now();
+            
+            timerInterval = setInterval(() => {
+                timeLeft = Math.max(0, 60 - Math.floor((Date.now() - startTime) / 1000));
+                timerElement.textContent = `Time: ${timeLeft}s`;
+                
+                if (timeLeft === 0) {
+                    endTest();
+                }
+            }, 1000);
+        }
+
+        function endTest() {
+            clearInterval(timerInterval);
+            inputField.disabled = true;
+            
+            // Send results to server
+            fetch('{% url "save_result" %}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'X-CSRFToken': document.querySelector('[name="csrfmiddlewaretoken"]').value
+                },
+                body: `wpm=${correctWords}`
+            })
+            .then(response => response.text())
+            .then(html => {
+                document.getElementById('results').innerHTML = html;
+                document.getElementById('results').style.display = 'block';
+            });
+        }
+
+        function checkWord() {
+            const currentIndex = parseInt(gameState.value);
+            const currentWord = words[currentIndex];
+            const typedWord = inputField.value.trim();
+
+            if (typedWord === currentWord) {
+                correctWords++;
+                gameState.value = currentIndex + 1;
+                
+                // Update display
+                if (currentIndex < words.length - 1) {
+                    const nextWord = words[currentIndex + 1];
+                    const remainingWords = words.slice(currentIndex + 2).join(' ');
+                    wordDisplay.innerHTML = `
+                        <span class="current-word">${nextWord}</span>
+                        <span class="word-queue">${remainingWords}</span>
+                    `;
+                } else {
+                    endTest();
+                }
+                
+                inputField.value = '';
+                inputField.className = '';
+            }
+        }
+
+        inputField.addEventListener('input', function(e) {
+            if (!startTime) {
+                startTimer();
+            }
+
+            const currentWord = words[parseInt(gameState.value)];
+            const typedWord = inputField.value.trim();
+            
+            // Update input field style based on correctness
+            if (typedWord === '') {
+                inputField.className = '';
+            } else if (currentWord.startsWith(typedWord)) {
+                inputField.className = 'correct';
+            } else {
+                inputField.className = 'incorrect';
+            }
+        });
+
+        inputField.addEventListener('keypress', function(e) {
+            if (e.key === ' ') {
+                e.preventDefault();
+                checkWord();
+            }
+        });
+
+        // Handle Try Again button clicks
+        document.addEventListener('click', function(e) {
+            if (e.target.matches('.try-again-btn')) {
+                window.location.reload();
+            }
+        });
+    </script>
+</body>
+</html>
